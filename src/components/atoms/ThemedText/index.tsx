@@ -17,7 +17,6 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'subtitle' && styles.subtitle,
         type === 'link' && styles.link,
         type === 'linkPrimary' && styles.linkPrimary,
-        type === 'code' && styles.code,
         style,
       ]}
       {...rest}
