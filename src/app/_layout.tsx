@@ -1,17 +1,11 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import { useColorScheme } from "react-native";
+import { TabLayout } from '@/components/organisms/TabLayout';
+import { ThemeProvider } from '@/context/theme-provider';
+import '@/global.css';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  // return <Stack screenOptions={{
-  //   // TODO: CUSTOMIZE HEADER HERE
-  //   headerTransparent: true,
-  //   headerTitleAlign: 'center'
-  // }}/>;
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack />
+    <ThemeProvider>
+      <TabLayout />
     </ThemeProvider>
   )
 }

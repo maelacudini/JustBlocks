@@ -1,21 +1,20 @@
-import { Fonts } from "@/constants/theme";
-import { Platform, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
   small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: 400,
   },
   smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: 600,
   },
   default: {
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: 500,
+    fontWeight: 400,
   },
   title: {
     fontSize: 48,
@@ -28,19 +27,15 @@ const styles = StyleSheet.create({
     fontWeight: 600,
   },
   link: {
-    lineHeight: 30,
-    fontSize: 14,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: 600,
   },
   linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
-    color: '#3c87f7',
-  },
-  code: {
-    fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
-  },
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: 600,
+  }
 });
 
 export default styles;

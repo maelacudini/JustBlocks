@@ -1,15 +1,15 @@
-import { useTheme } from '@/hooks/use-theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { Text } from 'react-native';
 import styles from './styles';
 import { ThemedTextProps } from './types';
 
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
-  const theme = useTheme();
+  const { colors } = useAppTheme();
 
   return (
     <Text
       style={[
-        { color: theme[themeColor ?? 'foreground'] },
+        { color: colors[themeColor ?? 'foreground'] },
         type === 'default' && styles.default,
         type === 'title' && styles.title,
         type === 'small' && styles.small,
