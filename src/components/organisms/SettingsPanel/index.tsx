@@ -1,8 +1,8 @@
 import { ThemedText } from '@/components/atoms/ThemedText';
 import { SettingRow } from '@/components/molecules/SettingRow';
 import { useAppTheme } from '@/context/theme-provider';
-import { useAppSettings } from '@/hooks/use-app-settings';
 import { ActivityIndicator, View } from 'react-native';
+import { useAppSettings } from './hooks/use-app-settings';
 
 export function SettingsPanel() {
   const {
@@ -28,7 +28,7 @@ export function SettingsPanel() {
   return (
     <View style={{maxWidth: 800, width: '100%', marginHorizontal: 'auto', display: 'flex', flexDirection: 'column', gap: 40}}>
       <ThemedText type="title">
-        Preferences
+        Settings
       </ThemedText>
 
       <View style={{display: 'flex', flexDirection: 'column', gap: 24}}>

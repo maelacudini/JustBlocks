@@ -11,7 +11,7 @@ export default function Index() {
     }}>
       <ThemedText>Just Blocks</ThemedText>
       <Link href="/game">
-        <ThemedText>
+        <ThemedText type='link'>
           Play the game
         </ThemedText>
       </Link>
