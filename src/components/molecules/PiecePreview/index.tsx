@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { PieceInstance, PieceShape } from '@/game/engine/types';
 import { PieceCell } from '../../atoms/PieceCell';
@@ -65,8 +65,7 @@ export function PiecePreview({
   );
 
   return (
-    <GestureHandlerRootView>
-      <GestureDetector gesture={gesture}>
+    <GestureDetector gesture={gesture}>
       <View
         accessibilityRole="button"
         accessibilityLabel={`Drag piece ${piece.shapeId}`}
@@ -92,7 +91,6 @@ export function PiecePreview({
         ))}
       </View>
     </GestureDetector>
-    </GestureHandlerRootView>
   );
 }
 

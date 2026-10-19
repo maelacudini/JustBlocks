@@ -25,16 +25,16 @@ export interface DragPreview {
 /**
  * Connects the game engine to React state and drag-and-drop interactions.
  *
- * The engine remains responsible for validating moves and updating
- * the game. This hook only coordinates UI state and engine actions.
+ * The engine handles game rules and move validation. This hook manages
+ * React state, board measurements, and drag interactions.
  */
 export function useGame() {
   const [state, setState] = useState<GameState>(() =>
     createNewGame(),
   );
 
-  const stateRef = useRef(state);
-  stateRef.current = state;
+  // Initialized once; updated only by event handlers.
+  const stateRef = useRef<GameState>(state);
 
   const [boardMetrics, setBoardMetrics] =
     useState<BoardMetrics | null>(null);
@@ -45,9 +45,16 @@ export function useGame() {
   const dragPreviewRef = useRef<DragPreview | null>(null);
 
   /**
-   * Updates the visible drag preview and its synchronous ref.
-   * The ref lets finishDrag read the latest position without
-   * relying on a potentially stale React closure.
+   * Synchronizes the ref and React state after a game action.
+   * Call this from event handlers, never during render.
+   */
+  const commitState = useCallback((nextState: GameState) => {
+    stateRef.current = nextState;
+    setState(nextState);
+  }, []);
+
+  /**
+   * Updates the drag preview and its synchronous ref.
    */
   const setPreview = useCallback(
     (preview: DragPreview | null) => {
@@ -71,6 +78,7 @@ export function useGame() {
     [setPreview],
   );
 
+
   const updateDrag = useCallback(
     (
       pieceId: string,
@@ -84,6 +92,7 @@ export function useGame() {
 
       const { x, y, width, height, cellSize } = boardMetrics;
 
+      // Only calculate a placement while the finger is over the board.
       const insideBoard =
         absoluteX >= x &&
         absoluteX < x + width &&
@@ -95,9 +104,33 @@ export function useGame() {
         return;
       }
 
+      // Find the dimensions of the piece being dragged.
+      const piece = stateRef.current.tray.find(
+        (item) => item.id === pieceId,
+      );
+
+      const shape = piece
+        ? PIECE_SHAPE_BY_ID.get(piece.shapeId)
+        : undefined;
+
+      if (!shape || shape.cells.length === 0) {
+        setPreview({ pieceId, position: null });
+        return;
+      }
+
+      const rows =
+        Math.max(...shape.cells.map(([row]) => row)) + 1;
+
+      const columns =
+        Math.max(...shape.cells.map(([, column]) => column)) + 1;
+
+      // Offset by half the piece's size so its center follows the finger.
+      const relativeX = absoluteX - x - (columns * cellSize) / 2;
+      const relativeY = absoluteY - y - (rows * cellSize) / 2;
+
       const position: Position = {
-        row: Math.floor((absoluteY - y) / cellSize),
-        column: Math.floor((absoluteX - x) / cellSize),
+        row: Math.floor(relativeY / cellSize),
+        column: Math.floor(relativeX / cellSize),
       };
 
       setPreview({ pieceId, position });
@@ -120,14 +153,13 @@ export function useGame() {
         );
 
         if (result.ok) {
-          stateRef.current = result.state;
-          setState(result.state);
+          commitState(result.state);
         }
       }
 
       setPreview(null);
     },
-    [setPreview],
+    [commitState, setPreview],
   );
 
   const cancelDrag = useCallback(() => {
@@ -137,18 +169,16 @@ export function useGame() {
   const restart = useCallback(() => {
     const nextState = createNewGame();
 
-    stateRef.current = nextState;
-    setState(nextState);
+    commitState(nextState);
     setPreview(null);
-  }, [setPreview]);
+  }, [commitState, setPreview]);
 
   const spendLife = useCallback(() => {
     const result = refreshTray(stateRef.current);
 
-    stateRef.current = result.state;
-    setState(result.state);
+    commitState(result.state);
     setPreview(null);
-  }, [setPreview]);
+  }, [commitState, setPreview]);
 
   const previewShape = dragPreview
     ? PIECE_SHAPE_BY_ID.get(
