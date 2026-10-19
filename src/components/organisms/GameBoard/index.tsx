@@ -25,16 +25,20 @@ export function GameBoard({
   onMeasure,
 }: GameBoardProps) {
   const boardRef = useRef<View>(null);
+  const gridRef = useRef<View>(null);
   const { colors } = useAppTheme();
 
   const measureBoard = useCallback(() => {
-    boardRef.current?.measureInWindow((x, y, width, height) => {
+    gridRef.current?.measureInWindow((x, y, width, height) => {
+      const cellPitch = width / BOARD_SIZE;
+
       onMeasure({
         x,
         y,
         width,
         height,
-        cellSize: width / BOARD_SIZE,
+        cellPitch,
+        cellSize: cellPitch - 2,
       });
     });
   }, [onMeasure]);
@@ -96,22 +100,24 @@ export function GameBoard({
         { backgroundColor: colors.card, borderColor: colors.border },
       ]}
     >
-      {board.map((row, rowIndex) => (
-        <View key={`row-${rowIndex}`} style={styles.row}>
-          {row.map((occupied, columnIndex) => {
-            const key = `${rowIndex},${columnIndex}`;
+      <View ref={gridRef} style={styles.grid}> 
+        {board.map((row, rowIndex) => (
+          <View key={`row-${rowIndex}`} style={styles.row}>
+            {row.map((occupied, columnIndex) => {
+              const key = `${rowIndex},${columnIndex}`;
 
-            return (
-              <BoardCell
-                key={key}
-                occupied={occupied}
-                preview={previewCells.has(key)}
-                previewValid={Boolean(previewValid)}
-              />
-            );
-          })}
+              return (
+                <BoardCell
+                  key={key}
+                  occupied={occupied}
+                  preview={previewCells.has(key)}
+                  previewValid={Boolean(previewValid)}
+                />
+              );
+            })}
+          </View>
+        ))}
         </View>
-      ))}
     </View>
   );
 }
@@ -124,6 +130,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  grid: {
+    flex: 1,
   },
   row: {
     flex: 1,

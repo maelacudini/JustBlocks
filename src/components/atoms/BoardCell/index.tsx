@@ -19,14 +19,14 @@ export function BoardCell({
   const { colors } = useAppTheme();
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        scale: withTiming(occupied ? 1 : preview ? 0.92 : 1, {
-          duration: 140,
-        }),
-      },
-    ],
-    opacity: withTiming(occupied || preview ? 1 : 0.65, {
+    // transform: [
+    //   {
+    //     scale: withTiming(occupied ? 1 : preview ? 0.92 : 1, {
+    //       duration: 140,
+    //     }),
+    //   },
+    // ],
+    opacity: withTiming(occupied ? 1 : 0.4, {
       duration: 140,
     }),
   }), [occupied, preview]);

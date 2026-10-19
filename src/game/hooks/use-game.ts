@@ -1,4 +1,3 @@
-
 import { useCallback, useRef, useState } from 'react';
 
 import { PIECE_SHAPE_BY_ID } from '../engine/const';
@@ -14,6 +13,9 @@ export interface BoardMetrics {
   readonly y: number;
   readonly width: number;
   readonly height: number;
+  /** Distance between the starting edges of adjacent board cells. */
+  readonly cellPitch: number;
+  /** Visible cell size, excluding its margins. */
   readonly cellSize: number;
 }
 
@@ -22,169 +24,147 @@ export interface DragPreview {
   readonly position: Position | null;
 }
 
-/**
- * Connects the game engine to React state and drag-and-drop interactions.
- *
- * The engine handles game rules and move validation. This hook manages
- * React state, board measurements, and drag interactions.
- */
-export function useGame() {
-  const [state, setState] = useState<GameState>(() =>
-    createNewGame(),
-  );
+export interface DragPoint {
+  readonly pieceId: string;
+  readonly x: number;
+  readonly y: number;
+}
 
-  // Initialized once; updated only by event handlers.
-  const stateRef = useRef<GameState>(state);
+const FLOATING_GAP = 40;
+
+export function useGame() {
+  const [state, setState] = useState<GameState>(() => createNewGame());
+  const stateRef = useRef(state);
 
   const [boardMetrics, setBoardMetrics] =
     useState<BoardMetrics | null>(null);
-
   const [dragPreview, setDragPreview] =
     useState<DragPreview | null>(null);
+  const [dragPoint, setDragPoint] =
+    useState<DragPoint | null>(null);
 
   const dragPreviewRef = useRef<DragPreview | null>(null);
 
-  /**
-   * Synchronizes the ref and React state after a game action.
-   * Call this from event handlers, never during render.
-   */
   const commitState = useCallback((nextState: GameState) => {
     stateRef.current = nextState;
     setState(nextState);
   }, []);
 
-  /**
-   * Updates the drag preview and its synchronous ref.
-   */
-  const setPreview = useCallback(
-    (preview: DragPreview | null) => {
-      dragPreviewRef.current = preview;
-      setDragPreview(preview);
-    },
-    [],
-  );
+  const setPreview = useCallback((preview: DragPreview | null) => {
+    dragPreviewRef.current = preview;
+    setDragPreview(preview);
+  }, []);
 
-  const updateBoardMetrics = useCallback(
-    (metrics: BoardMetrics) => {
-      setBoardMetrics(metrics);
-    },
-    [],
-  );
+  const clearDrag = useCallback(() => {
+    setPreview(null);
+    setDragPoint(null);
+  }, [setPreview]);
 
-  const startDrag = useCallback(
-    (pieceId: string) => {
+  const updateBoardMetrics = useCallback((metrics: BoardMetrics) => {
+    setBoardMetrics(metrics);
+  }, []);
+
+  const startDrag = useCallback((pieceId: string) => {
+    setPreview({ pieceId, position: null });
+  }, [setPreview]);
+
+  const updateDrag = useCallback((
+    pieceId: string,
+    absoluteX: number,
+    absoluteY: number,
+  ) => {
+    const currentState = stateRef.current;
+    const piece = currentState.tray.find(item => item.id === pieceId);
+    const shape = piece
+      ? PIECE_SHAPE_BY_ID.get(piece.shapeId)
+      : undefined;
+
+    if (!shape || !boardMetrics || boardMetrics.cellPitch <= 0) {
+      setDragPoint({ pieceId, x: absoluteX, y: absoluteY });
       setPreview({ pieceId, position: null });
-    },
-    [setPreview],
-  );
+      return;
+    }
 
+    const rows = Math.max(...shape.cells.map(([row]) => row)) + 1;
+    const columns =
+      Math.max(...shape.cells.map(([, column]) => column)) + 1;
 
-  const updateDrag = useCallback(
-    (
-      pieceId: string,
-      absoluteX: number,
-      absoluteY: number,
-    ) => {
-      if (!boardMetrics || boardMetrics.cellSize <= 0) {
-        setPreview({ pieceId, position: null });
-        return;
-      }
+    // Center the piece horizontally and keep it above the finger.
+    const floatingLeft = absoluteX - (columns * boardMetrics.cellPitch) / 2;
+    const floatingTop =
+      absoluteY - rows * boardMetrics.cellPitch - FLOATING_GAP;
 
-      const { x, y, width, height, cellSize } = boardMetrics;
+    setDragPoint({ pieceId, x: absoluteX, y: absoluteY });
 
-      // Only calculate a placement while the finger is over the board.
-      const insideBoard =
-        absoluteX >= x &&
-        absoluteX < x + width &&
-        absoluteY >= y &&
-        absoluteY < y + height;
+    // Snap the floating piece's top-left corner to the board grid.
+    const position: Position = {
+      row: Math.floor(
+        (floatingTop - boardMetrics.y) / boardMetrics.cellPitch,
+      ),
+      column: Math.floor(
+        (floatingLeft - boardMetrics.x) / boardMetrics.cellPitch,
+      ),
+    };
 
-      if (!insideBoard) {
-        setPreview({ pieceId, position: null });
-        return;
-      }
+    setPreview({ pieceId, position });
+  }, [boardMetrics, setPreview]);
 
-      // Find the dimensions of the piece being dragged.
-      const piece = stateRef.current.tray.find(
-        (item) => item.id === pieceId,
-      );
+  const finishDrag = useCallback((pieceId: string) => {
+    const preview = dragPreviewRef.current;
 
+    if (preview?.pieceId === pieceId && preview.position !== null) {
+      const currentState = stateRef.current;
+      const piece = currentState.tray.find(item => item.id === pieceId);
       const shape = piece
         ? PIECE_SHAPE_BY_ID.get(piece.shapeId)
         : undefined;
 
-      if (!shape || shape.cells.length === 0) {
-        setPreview({ pieceId, position: null });
-        return;
+      // Only commit a move when every cell is inside the board
+      // and currently unoccupied.
+      const position = preview.position;
+      const valid = Boolean(shape) && shape!.cells.every(
+        ([rowOffset, columnOffset]) => {
+          const row = position.row + rowOffset;
+          const column = position.column + columnOffset;
+
+          return (
+            row >= 0 &&
+            row < currentState.board.length &&
+            column >= 0 &&
+            column < currentState.board[row].length &&
+            !currentState.board[row][column]
+          );
+        },
+      );
+
+      if (valid) {
+        const result = placePiece(currentState, pieceId, position);
+        if (result.ok) commitState(result.state);
       }
+    }
 
-      const rows =
-        Math.max(...shape.cells.map(([row]) => row)) + 1;
-
-      const columns =
-        Math.max(...shape.cells.map(([, column]) => column)) + 1;
-
-      // Offset by half the piece's size so its center follows the finger.
-      const relativeX = absoluteX - x - (columns * cellSize) / 2;
-      const relativeY = absoluteY - y - (rows * cellSize) / 2;
-
-      const position: Position = {
-        row: Math.floor(relativeY / cellSize),
-        column: Math.floor(relativeX / cellSize),
-      };
-
-      setPreview({ pieceId, position });
-    },
-    [boardMetrics, setPreview],
-  );
-
-  const finishDrag = useCallback(
-    (pieceId: string) => {
-      const preview = dragPreviewRef.current;
-
-      if (
-        preview?.pieceId === pieceId &&
-        preview.position !== null
-      ) {
-        const result = placePiece(
-          stateRef.current,
-          pieceId,
-          preview.position,
-        );
-
-        if (result.ok) {
-          commitState(result.state);
-        }
-      }
-
-      setPreview(null);
-    },
-    [commitState, setPreview],
-  );
+    clearDrag();
+  }, [clearDrag, commitState]);
 
   const cancelDrag = useCallback(() => {
-    setPreview(null);
-  }, [setPreview]);
+    clearDrag();
+  }, [clearDrag]);
 
   const restart = useCallback(() => {
-    const nextState = createNewGame();
-
-    commitState(nextState);
-    setPreview(null);
-  }, [commitState, setPreview]);
+    commitState(createNewGame());
+    clearDrag();
+  }, [clearDrag, commitState]);
 
   const spendLife = useCallback(() => {
     const result = refreshTray(stateRef.current);
-
     commitState(result.state);
-    setPreview(null);
-  }, [commitState, setPreview]);
+    clearDrag();
+  }, [clearDrag, commitState]);
 
   const previewShape = dragPreview
     ? PIECE_SHAPE_BY_ID.get(
-        state.tray.find(
-          (piece) => piece.id === dragPreview.pieceId,
-        )?.shapeId ?? '',
+        state.tray.find(piece => piece.id === dragPreview.pieceId)
+          ?.shapeId ?? '',
       )
     : undefined;
 
@@ -192,6 +172,7 @@ export function useGame() {
     state,
     boardMetrics,
     dragPreview,
+    dragPoint,
     previewShape,
     updateBoardMetrics,
     startDrag,

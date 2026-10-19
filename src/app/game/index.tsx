@@ -1,21 +1,37 @@
 import { Stack, useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  LayoutChangeEvent,
   Pressable,
   StyleSheet,
   Text,
   View
 } from 'react-native';
 
+import { FloatingPiece } from '@/components/molecules/FloatingPiece';
 import { LivesIndicator } from '@/components/molecules/LivesIndicator';
 import { GameBoard } from '@/components/organisms/GameBoard';
 import { PieceTray } from '@/components/organisms/PieceTray';
 import { useAppTheme } from '@/context/theme-provider';
+import { PIECE_SHAPE_BY_ID } from '@/game/engine/const';
 import { useGame } from '@/game/hooks/use-game';
 
 export default function GameScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
+
+  const rootRef = useRef<View>(null);
+  const [screenOrigin, setScreenOrigin] = useState({ x: 0, y: 0 });
+
+  const measureScreen = useCallback(() => {
+    rootRef.current?.measureInWindow((x, y) => {
+      setScreenOrigin({ x, y });
+    });
+  }, []);
+
+  const handleRootLayout = useCallback((_event: LayoutChangeEvent) => {
+    requestAnimationFrame(measureScreen);
+  }, [measureScreen]);
 
   const {
     state,
@@ -27,6 +43,8 @@ export default function GameScreen() {
     cancelDrag,
     restart,
     spendLife,
+    boardMetrics,
+    dragPoint,
   } = useGame();
 
   const activeShapeId = useMemo(
@@ -41,7 +59,11 @@ export default function GameScreen() {
   const needsRefresh = state.status === 'needs-refresh';
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View
+      ref={rootRef}
+      onLayout={handleRootLayout}
+      style={[styles.screen, { backgroundColor: colors.background }]}
+    >
       <Stack.Screen options={{ headerShown: false }} />
 
         <View style={styles.header}>
@@ -105,6 +127,40 @@ export default function GameScreen() {
           onDragEnd={finishDrag}
           onDragCancel={cancelDrag}
         />
+
+        {dragPoint && boardMetrics && (() => {
+          const piece = state.tray.find(
+            item => item.id === dragPoint.pieceId,
+          );
+          const shape = piece
+            ? PIECE_SHAPE_BY_ID.get(piece.shapeId)
+            : undefined;
+
+          if (!shape) return null;
+
+          const rows = Math.max(...shape.cells.map(([row]) => row)) + 1;
+          const columns =
+            Math.max(...shape.cells.map(([, column]) => column)) + 1;
+
+          return (
+            <FloatingPiece
+              shape={shape}
+              cellSize={boardMetrics.cellSize}
+              cellPitch={boardMetrics.cellPitch}
+              left={
+                dragPoint.x -
+                screenOrigin.x -
+                (columns * boardMetrics.cellPitch) / 2
+              }
+              top={
+                dragPoint.y -
+                screenOrigin.y -
+                rows * boardMetrics.cellPitch -
+                60
+              }
+            />
+          );
+        })()}
 
         {needsRefresh && (
           <View
